@@ -142,6 +142,31 @@ class Bomb:
         self.rct.move_ip(self.vx, self.vy)
         screen.blit(self.img, self.rct)
 
+class Explosion:
+    """
+    GIF画像を使った爆発エフェクトクラス
+    """
+    def __init__(self, center: tuple[int, int]):
+        self.frames = []
+        explosion_gif = pg.image.load("fig/explosion.gif")
+        w, h = explosion_gif.get_size()
+        # フレーム数を仮に5分割（GIFに応じて調整）
+        frame_w = w // 5
+        for i in range(5):
+            frame = explosion_gif.subsurface((i * frame_w, 0, frame_w, h))
+            self.frames.append(pg.transform.scale(frame, (60, 60)))  # サイズ調整
+        self.index = 0
+        self.rct = self.frames[0].get_rect(center=center)
+
+    def update(self, screen: pg.Surface) -> bool:
+        """フレームを1つ進めて描画。終了したらFalseを返す。"""
+        if self.index >= len(self.frames):
+            return False
+        screen.blit(self.frames[self.index], self.rct)
+        self.index += 1
+        return True
+
+
 class Score:
     """
     打ち落とした爆弾の数を表示するクラス
@@ -177,7 +202,8 @@ def main():
     #     bombs.append(bomb)
     bombs = [Bomb((255, 0, 0), 10) for _ in range(NUM_OF_BOMBS)]
     score = Score()
-    beams:list[Beam] = []  # ゲーム初期化時にはビームは存在しない
+    beams:list[Beam] = []
+    explosions: list[Explosion] = []
     clock = pg.time.Clock()
     tmr = 0
     while True:
@@ -204,6 +230,7 @@ def main():
                 if bm is None:
                     continue
                 if bm.rct.colliderect(bomb.rct):
+                    explosions.append(Explosion(bomb.rct.center))
                     beams[si] = None
                     bombs[bi] = None
                     bird.change_img(6, screen)
@@ -223,6 +250,11 @@ def main():
 
         for bomb in bombs:
             bomb.update(screen)
+        new_explosions = []
+        for ex in explosions:
+            if ex.update(screen):
+                new_explosions.append(ex)
+        explosions = new_explosions
         score.update(screen)
         pg.display.update()
         tmr += 1
