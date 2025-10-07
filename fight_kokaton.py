@@ -7,7 +7,7 @@ import pygame as pg
 
 WIDTH = 1100  # ゲームウィンドウの幅
 HEIGHT = 650  # ゲームウィンドウの高さ
-NUM_OF_BOMBS = 5  # 爆弾の個数
+NUM_OF_BOMBS = 20  # 爆弾の個数
 os.chdir(os.path.dirname(os.path.abspath(__file__)))
 
 
@@ -100,14 +100,16 @@ class Beam:
         self.rct.left = bird.rct.right  # こうかとんの右座標
         self.vx, self.vy = +5, 0
 
-    def update(self, screen: pg.Surface):
+    def update(self, screen: pg.Surface) -> bool:
         """
         ビームを速度ベクトルself.vx, self.vyに基づき移動させる
         引数 screen：画面Surface
         """
-        if check_bound(self.rct) == (True, True):
-            self.rct.move_ip(self.vx, self.vy)
-            screen.blit(self.img, self.rct)    
+        self.rct.move_ip(self.vx, self.vy)
+        if check_bound(self.rct) != (True, True):
+            return False
+        screen.blit(self.img, self.rct)
+        return True
 
 
 class Bomb:
@@ -175,7 +177,7 @@ def main():
     #     bombs.append(bomb)
     bombs = [Bomb((255, 0, 0), 10) for _ in range(NUM_OF_BOMBS)]
     score = Score()
-    beam = None  # ゲーム初期化時にはビームは存在しない
+    beams:list[Beam] = []  # ゲーム初期化時にはビームは存在しない
     clock = pg.time.Clock()
     tmr = 0
     while True:
@@ -184,7 +186,7 @@ def main():
                 return
             if event.type == pg.KEYDOWN and event.key == pg.K_SPACE:
                 # スペースキー押下でBeamクラスのインスタンス生成
-                beam = Beam(bird)            
+                beams.append(Beam(bird))         
         screen.blit(bg_img, [0, 0])
         
         for bomb in bombs:
@@ -195,20 +197,30 @@ def main():
                 time.sleep(1)
                 return
         
-        for b, bomb in enumerate(bombs):
-            if beam is not None:
-                if beam.rct.colliderect(bomb.rct):
-                    # ビームと爆弾の衝突判定
-                    beam, bombs[b] = None, None
+        for bi, bomb in enumerate(bombs):
+            if bomb is None:
+                continue
+            for si, bm in enumerate(beams):
+                if bm is None:
+                    continue
+                if bm.rct.colliderect(bomb.rct):
+                    beams[si] = None
+                    bombs[bi] = None
                     bird.change_img(6, screen)
                     score.add(1)
-                    break
-        bombs = [bomb for bomb in bombs if bomb is not None]
+                    break  # 爆弾1つにつき1発だけ有効
+        bombs = [b for b in bombs if b is not None]
+        beams = [s for s in beams if s is not None]
+
 
         key_lst = pg.key.get_pressed()
         bird.update(key_lst, screen)
-        if beam is not None:
-            beam.update(screen)   
+        new_beams = []
+        for bm in beams:
+            if bm.update(screen):     # 画面内に残るビームだけ残す
+                new_beams.append(bm)
+        beams = new_beams
+
         for bomb in bombs:
             bomb.update(screen)
         score.update(screen)
